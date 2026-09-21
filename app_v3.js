@@ -672,9 +672,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (total > 1) {
                 historyHtml = `
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; color: var(--text-muted); font-size: 0.85rem; background: rgba(255,255,255,0.05); padding: 0.4rem 0.8rem; border-radius: 8px;">
-                        <button class="history-nav-btn prev-btn" ${defData.current === 0 ? 'disabled' : ''}>&larr;</button>
+                        <button class="history-nav-btn prev-btn" ${defData.current === 0 ? 'disabled' : ''}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                        </button>
                         <span>Version ${defData.current + 1} of ${total}</span>
-                        <button class="history-nav-btn next-btn" ${defData.current === total - 1 ? 'disabled' : ''}>&rarr;</button>
+                        <button class="history-nav-btn next-btn" ${defData.current === total - 1 ? 'disabled' : ''}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                        </button>
                     </div>
                 `;
             }
