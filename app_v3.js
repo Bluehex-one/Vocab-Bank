@@ -55,6 +55,14 @@ document.addEventListener('DOMContentLoaded', () => {
     let aiDefinitions = JSON.parse(localStorage.getItem('ai-definitions')) || {};
     let activeDefinitions = {}; // Track which cards have definitions open
 
+    // Migration for customDefinitions (string to {text, media})
+    Object.keys(customDefinitions).forEach(key => {
+        if (typeof customDefinitions[key] === 'string') {
+            customDefinitions[key] = { text: customDefinitions[key], media: [] };
+        }
+    });
+    localStorage.setItem('custom-definitions', JSON.stringify(customDefinitions));
+
     // Migration from old array-based storage to object-based storage
     if (!vocabulary) {
         const oldVocab = JSON.parse(localStorage.getItem('vocabulary'));
@@ -512,9 +520,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             
                             <div class="custom-def-view hidden" style="margin-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem;">
                                 <div class="custom-def-display"></div>
-                                <button class="btn-secondary toggle-manual-def-btn" style="margin-top: 1rem; margin-bottom: 1rem; width: 100%;">✎ Edit Custom Definition</button>
-                                <div class="manual-def-form hidden">
-                                    <textarea class="custom-textarea manual-def-input" placeholder="Type your own definition here..." rows="3"></textarea>
                                     <button class="btn-primary save-manual-def-btn" style="margin-top: 0.5rem; width: 100%;">Save Custom</button>
                                 </div>
                             </div>
@@ -540,6 +545,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const aiDefView = card.querySelector('.ai-def-view');
                 const customDefView = card.querySelector('.custom-def-view');
                 const customDefDisplay = card.querySelector('.custom-def-display');
+                const customMediaDisplay = card.querySelector('.custom-media-display');
                 
                 const setDefinitionHTML = (el, text, prefixHTML = '') => {
                     if (window.marked) {
@@ -552,6 +558,29 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 };
                 
+                // Helper to render media
+                const renderMedia = (urls, container) => {
+                    container.innerHTML = '';
+                    if (!urls || urls.length === 0) return;
+                    urls.forEach(url => {
+                        const item = document.createElement('div');
+                        item.className = 'media-item';
+                        if (url.includes('youtube.com/watch') || url.includes('youtu.be/')) {
+                            let videoId = '';
+                            if (url.includes('youtube.com')) videoId = new URL(url).searchParams.get('v');
+                            if (url.includes('youtu.be')) videoId = url.split('youtu.be/')[1].split('?')[0];
+                            item.innerHTML = `<iframe src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe>`;
+                        } else if (url.match(/\\.(jpeg|jpg|gif|png)$/i)) {
+                            item.innerHTML = `<img src="${url}" alt="Attachment">`;
+                        } else if (url.match(/\\.(mp4|webm)$/i)) {
+                            item.innerHTML = `<video src="${url}" controls></video>`;
+                        } else {
+                            item.innerHTML = `<a href="${url}" target="_blank" style="padding: 1rem; display: block; color: var(--primary);">Open Link</a>`;
+                        }
+                        container.appendChild(item);
+                    });
+                };
+                
                 // View switching
                 const showCustomView = () => {
                     aiDefView.classList.add('hidden');
@@ -560,9 +589,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     customToggleBtn.classList.add('active');
                     
                     if (customDefinitions[word]) {
-                        setDefinitionHTML(customDefDisplay, customDefinitions[word]);
+                        setDefinitionHTML(customDefDisplay, customDefinitions[word].text);
+                        renderMedia(customDefinitions[word].media, customMediaDisplay);
                     } else {
                         customDefDisplay.innerHTML = '<em style="color:var(--text-muted);">No custom definition saved yet.</em>';
+                        customMediaDisplay.innerHTML = '';
                     }
                 };
                 
@@ -590,10 +621,30 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 });
                 
+                const addMediaBtn = card.querySelector('.add-media-btn');
+                
+                addMediaBtn.addEventListener('click', () => {
+                    showCustomDialog({
+                        title: 'Add Media URL',
+                        message: 'Paste a link to a YouTube video, image, or mp4.',
+                        isInput: true,
+                        confirmText: 'Attach'
+                    }, (url) => {
+                        if (url && url.trim()) {
+                            if (!customDefinitions[word]) {
+                                customDefinitions[word] = { text: '', media: [] };
+                            }
+                            customDefinitions[word].media.push(url.trim());
+                            localStorage.setItem('custom-definitions', JSON.stringify(customDefinitions));
+                            showCustomView();
+                        }
+                    });
+                });
+                
                 toggleManualDefBtn.addEventListener('click', () => {
                     manualDefForm.classList.toggle('hidden');
                     if (!manualDefForm.classList.contains('hidden')) {
-                        manualDefInput.value = customDefinitions[word] || '';
+                        manualDefInput.value = customDefinitions[word] ? customDefinitions[word].text : '';
                         manualDefInput.focus();
                     }
                 });
@@ -601,9 +652,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 saveManualDefBtn.addEventListener('click', () => {
                     const def = manualDefInput.value.trim();
                     if (def) {
-                        customDefinitions[word] = def;
+                        if (!customDefinitions[word]) customDefinitions[word] = { media: [] };
+                        customDefinitions[word].text = def;
                     } else {
-                        delete customDefinitions[word];
+                        if (customDefinitions[word] && customDefinitions[word].media.length > 0) {
+                            customDefinitions[word].text = '';
+                        } else {
+                            delete customDefinitions[word];
+                        }
                     }
                     localStorage.setItem('custom-definitions', JSON.stringify(customDefinitions));
                     
@@ -647,11 +703,11 @@ document.addEventListener('DOMContentLoaded', () => {
         toggles.classList.remove('hidden'); // Show toggles immediately
         
         // Helper to set markdown/math HTML
-        const setDefinitionHTML = (text, prefixHTML = '') => {
+        const setDefinitionHTML = (text, prefixHTML = '', suffixHTML = '') => {
             if (window.marked) {
-                contentDiv.innerHTML = prefixHTML + window.marked.parse(text);
+                contentDiv.innerHTML = prefixHTML + window.marked.parse(text) + suffixHTML;
             } else {
-                contentDiv.innerHTML = prefixHTML + text;
+                contentDiv.innerHTML = prefixHTML + text + suffixHTML;
             }
             if (window.MathJax) {
                 window.MathJax.typesetPromise([contentDiv]).catch(err => console.error(err));
@@ -672,18 +728,40 @@ document.addEventListener('DOMContentLoaded', () => {
             if (total > 1) {
                 historyHtml = `
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; color: var(--text-muted); font-size: 0.85rem; background: rgba(255,255,255,0.05); padding: 0.4rem 0.8rem; border-radius: 8px;">
-                        <button class="history-nav-btn prev-btn" ${defData.current === 0 ? 'disabled' : ''}>
+                        <button class="history-nav-btn prev-btn" ${defData.current === 0 ? 'disabled' : ''} title="Previous Version">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
                         </button>
                         <span>Version ${defData.current + 1} of ${total}</span>
-                        <button class="history-nav-btn next-btn" ${defData.current === total - 1 ? 'disabled' : ''}>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-                        </button>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button class="history-nav-btn delete-version-btn" title="Delete Version">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                            </button>
+                            <button class="history-nav-btn next-btn" ${defData.current === total - 1 ? 'disabled' : ''} title="Next Version">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                            </button>
+                        </div>
                     </div>
                 `;
             }
             
-            setDefinitionHTML(currentItem.text, historyHtml + aiBadge);
+            // AI YouTube Video Embed HTML
+            let aiVideoHtml = '';
+            if (currentItem.text) {
+                const query = encodeURIComponent(`${word} ${section.replace(/\\//g, ' ')}`);
+                aiVideoHtml = `
+                    <details style="margin-top: 1rem; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; overflow: hidden;">
+                        <summary style="padding: 0.8rem; cursor: pointer; font-weight: 600; color: var(--text-light); list-style: none; display: flex; align-items: center; gap: 0.5rem;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+                            Watch AI Recommended Videos
+                        </summary>
+                        <div style="padding: 1rem; border-top: 1px solid rgba(255,255,255,0.1);">
+                            <iframe width="100%" height="250" src="https://www.youtube.com/embed?listType=search&list=${query}" frameborder="0" allowfullscreen></iframe>
+                        </div>
+                    </details>
+                `;
+            }
+            
+            setDefinitionHTML(currentItem.text, historyHtml + aiBadge, aiVideoHtml);
             
             if (currentItem.img) {
                 imgEl.src = currentItem.img;
@@ -695,6 +773,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (total > 1) {
                 const prevBtn = contentDiv.querySelector('.prev-btn');
                 const nextBtn = contentDiv.querySelector('.next-btn');
+                const deleteBtn = contentDiv.querySelector('.delete-version-btn');
+                
                 if (prevBtn) prevBtn.addEventListener('click', () => {
                     if (defData.current > 0) {
                         defData.current--;
@@ -708,6 +788,28 @@ document.addEventListener('DOMContentLoaded', () => {
                         localStorage.setItem('ai-definitions', JSON.stringify(aiDefinitions));
                         renderAiHistory();
                     }
+                });
+                if (deleteBtn) deleteBtn.addEventListener('click', () => {
+                    showCustomDialog({
+                        title: 'Delete Version',
+                        message: 'Are you sure you want to permanently delete this version of the AI definition?',
+                        confirmText: 'Delete',
+                        danger: true
+                    }, (confirm) => {
+                        if (confirm) {
+                            defData.history.splice(defData.current, 1);
+                            if (defData.current >= defData.history.length) {
+                                defData.current = defData.history.length - 1;
+                            }
+                            if (defData.history.length === 0) {
+                                delete aiDefinitions[word];
+                                contentWrapper.classList.add('hidden');
+                                activeDefinitions[word] = false;
+                            }
+                            localStorage.setItem('ai-definitions', JSON.stringify(aiDefinitions));
+                            if (aiDefinitions[word]) renderAiHistory();
+                        }
+                    });
                 });
             }
         };

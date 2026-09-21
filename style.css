@@ -46,7 +46,7 @@ body {
     min-height: 100vh;
 }
 
-/* Liquid Glass Background Effects */
+/* Performance-friendly Background Effects */
 .bg-animation {
     position: fixed;
     top: 0;
@@ -55,67 +55,25 @@ body {
     height: 100vh;
     z-index: -1;
     overflow: hidden;
-    background: #0f111a;
-}
-
-.blob {
-    position: absolute;
-    filter: blur(80px);
-    opacity: 0.6;
-    animation: liquidFloat 20s infinite ease-in-out alternate;
-}
-
-.blob-1 {
-    top: -10%;
-    left: -10%;
-    width: 60vw;
-    height: 60vw;
-    background: radial-gradient(circle, rgba(99,102,241,0.8) 0%, rgba(139,92,246,0) 70%);
-    animation-delay: 0s;
-}
-
-.blob-2 {
-    bottom: -20%;
-    right: -10%;
-    width: 70vw;
-    height: 70vw;
-    background: radial-gradient(circle, rgba(236,72,153,0.8) 0%, rgba(244,63,94,0) 70%);
-    animation-delay: -5s;
-}
-
-.blob-3 {
-    top: 40%;
-    left: 50%;
-    width: 50vw;
-    height: 50vw;
-    background: radial-gradient(circle, rgba(16,185,129,0.5) 0%, rgba(52,211,153,0) 70%);
-    animation-delay: -10s;
-    transform: translate(-50%, -50%);
-}
-
-@keyframes liquidFloat {
-    0% {
-        transform: translate(0, 0) scale(1) rotate(0deg);
-        border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
-    }
-    33% {
-        transform: translate(5vw, -5vh) scale(1.1) rotate(90deg);
-        border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
-    }
-    66% {
-        transform: translate(-5vw, 5vh) scale(0.9) rotate(180deg);
-        border-radius: 30% 70% 70% 40% / 50% 60% 30% 60%;
-    }
-    100% {
-        transform: translate(0, 0) scale(1) rotate(360deg);
-        border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
-    }
+    background: radial-gradient(circle at center, #1e1b4b 0%, #0f111a 100%);
 }
 
 .container {
-    max-width: 900px;
+    max-width: 1200px;
     margin: 0 auto;
     padding: 2rem;
+    position: relative;
+    z-index: 1;
+}
+
+/* Glassmorphism utilities - Lightened for performance */
+.glass-panel {
+    background: rgba(30, 32, 40, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
 
 header {
@@ -513,6 +471,26 @@ input:focus {
     border-color: var(--primary);
     background: rgba(0, 0, 0, 0.3);
     box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+.media-gallery {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+.media-item {
+    width: 100%;
+    border-radius: 8px;
+    overflow: hidden;
+    background: rgba(0,0,0,0.2);
+    border: 1px solid rgba(255,255,255,0.1);
+}
+.media-item iframe, .media-item img, .media-item video {
+    width: 100%;
+    display: block;
+    max-height: 300px;
+    object-fit: contain;
 }
 
 .history-nav-btn {
