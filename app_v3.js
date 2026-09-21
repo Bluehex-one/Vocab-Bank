@@ -68,10 +68,13 @@ document.addEventListener('DOMContentLoaded', () => {
         vocabulary = { ...defaultStructure, ...vocabulary };
     }
     
-    // Migration for aiDefinitions (string to object)
+    // Migration for aiDefinitions (string to object, then to history array)
     Object.keys(aiDefinitions).forEach(key => {
         if (typeof aiDefinitions[key] === 'string') {
-            aiDefinitions[key] = { text: aiDefinitions[key], img: null };
+            aiDefinitions[key] = { current: 0, history: [{ text: aiDefinitions[key], img: null }] };
+        } else if (aiDefinitions[key].text !== undefined) {
+            // Convert old {text, img} object to history format
+            aiDefinitions[key] = { current: 0, history: [{ text: aiDefinitions[key].text, img: aiDefinitions[key].img }] };
         }
     });
     localStorage.setItem('ai-definitions', JSON.stringify(aiDefinitions));
@@ -94,20 +97,25 @@ document.addEventListener('DOMContentLoaded', () => {
             dialogInput.classList.add('hidden');
         }
         
-        dialogConfirmBtn.textContent = confirmText;
+        let currentConfirmBtn = document.getElementById('dialog-confirm-btn');
+        let currentCancelBtn = document.getElementById('dialog-cancel-btn');
+        
+        let newConfirmBtn = currentConfirmBtn.cloneNode(true);
+        currentConfirmBtn.parentNode.replaceChild(newConfirmBtn, currentConfirmBtn);
+        
+        let newCancelBtn = currentCancelBtn.cloneNode(true);
+        currentCancelBtn.parentNode.replaceChild(newCancelBtn, currentCancelBtn);
+        
+        newConfirmBtn.textContent = confirmText;
         if (danger) {
-            dialogConfirmBtn.className = 'btn-danger';
+            newConfirmBtn.className = 'btn-danger';
         } else {
-            dialogConfirmBtn.className = 'btn-primary';
+            newConfirmBtn.className = 'btn-primary';
         }
         
         customDialog.classList.remove('hidden');
         
-        // Remove old event listeners
-        const newConfirmBtn = dialogConfirmBtn.cloneNode(true);
-        dialogConfirmBtn.parentNode.replaceChild(newConfirmBtn, dialogConfirmBtn);
-        const newCancelBtn = dialogCancelBtn.cloneNode(true);
-        dialogCancelBtn.parentNode.replaceChild(newCancelBtn, dialogCancelBtn);
+        customDialog.classList.remove('hidden');
         
         newConfirmBtn.addEventListener('click', () => {
             const val = isInput ? dialogInput.value : true;
@@ -653,16 +661,58 @@ document.addEventListener('DOMContentLoaded', () => {
         // Always make custom view accessible immediately
         customDefView.classList.add('hidden'); // hidden by default until toggle clicked
         
+        const renderAiHistory = () => {
+            const defData = aiDefinitions[word];
+            const currentItem = defData.history[defData.current];
+            const total = defData.history.length;
+            
+            const aiBadge = `<span class="ai-badge" style="font-size: 0.7rem; margin-right: 0.5rem; padding: 0.1rem 0.4rem; vertical-align: top;">AI</span>`;
+            
+            let historyHtml = '';
+            if (total > 1) {
+                historyHtml = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; color: var(--text-muted); font-size: 0.85rem; background: rgba(255,255,255,0.05); padding: 0.4rem 0.8rem; border-radius: 8px;">
+                        <button class="history-nav-btn prev-btn" ${defData.current === 0 ? 'disabled' : ''}>&larr;</button>
+                        <span>Version ${defData.current + 1} of ${total}</span>
+                        <button class="history-nav-btn next-btn" ${defData.current === total - 1 ? 'disabled' : ''}>&rarr;</button>
+                    </div>
+                `;
+            }
+            
+            setDefinitionHTML(currentItem.text, historyHtml + aiBadge);
+            
+            if (currentItem.img) {
+                imgEl.src = currentItem.img;
+                imgEl.classList.remove('hidden');
+            } else {
+                imgEl.classList.add('hidden');
+            }
+            
+            if (total > 1) {
+                const prevBtn = contentDiv.querySelector('.prev-btn');
+                const nextBtn = contentDiv.querySelector('.next-btn');
+                if (prevBtn) prevBtn.addEventListener('click', () => {
+                    if (defData.current > 0) {
+                        defData.current--;
+                        localStorage.setItem('ai-definitions', JSON.stringify(aiDefinitions));
+                        renderAiHistory();
+                    }
+                });
+                if (nextBtn) nextBtn.addEventListener('click', () => {
+                    if (defData.current < total - 1) {
+                        defData.current++;
+                        localStorage.setItem('ai-definitions', JSON.stringify(aiDefinitions));
+                        renderAiHistory();
+                    }
+                });
+            }
+        };
+
         // If we have cached AI definition and no extra instructions, use it
         if (aiDefinitions[word] && !extraInstructions) {
             contentWrapper.classList.remove('hidden');
             loading.classList.add('hidden');
-            const aiBadge = `<span class="ai-badge" style="font-size: 0.7rem; margin-right: 0.5rem; padding: 0.1rem 0.4rem; vertical-align: top;">AI</span>`;
-            setDefinitionHTML(aiDefinitions[word].text, aiBadge);
-            if (aiDefinitions[word].img) {
-                imgEl.src = aiDefinitions[word].img;
-                imgEl.classList.remove('hidden');
-            }
+            renderAiHistory();
             return;
         }
         
@@ -773,15 +823,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 } catch(e) {}
                 
                 // Cache it!
-                aiDefinitions[word] = { text: definitionText, img: wikiImg };
+                if (!aiDefinitions[word]) {
+                    aiDefinitions[word] = { current: 0, history: [] };
+                }
+                aiDefinitions[word].history.push({ text: definitionText, img: wikiImg });
+                aiDefinitions[word].current = aiDefinitions[word].history.length - 1;
+                
                 localStorage.setItem('ai-definitions', JSON.stringify(aiDefinitions));
                 
-                const aiBadge = `<span class="ai-badge" style="font-size: 0.7rem; margin-right: 0.5rem; padding: 0.1rem 0.4rem; vertical-align: top;">AI</span>`;
-                setDefinitionHTML(definitionText, aiBadge);
-                if (wikiImg) {
-                    imgEl.src = wikiImg;
-                    imgEl.classList.remove('hidden');
-                }
+                renderAiHistory();
             } else {
                 // Fallback to Wikipedia API
                 let lang = 'en';
@@ -799,17 +849,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 if (data.extract) {
                     let wikiImg = data.thumbnail ? data.thumbnail.source : null;
-                    // Cache Wikipedia result as well to save network requests
-                    aiDefinitions[word] = { text: data.extract, img: wikiImg };
+                    // Cache Wikipedia result
+                    if (!aiDefinitions[word]) {
+                        aiDefinitions[word] = { current: 0, history: [] };
+                    }
+                    aiDefinitions[word].history.push({ text: data.extract, img: wikiImg });
+                    aiDefinitions[word].current = aiDefinitions[word].history.length - 1;
+                    
                     localStorage.setItem('ai-definitions', JSON.stringify(aiDefinitions));
                     
-                    setDefinitionHTML(data.extract);
-                    
-                    // Show image if available!
-                    if (wikiImg) {
-                        imgEl.src = wikiImg;
-                        imgEl.classList.remove('hidden');
-                    }
+                    renderAiHistory();
                 } else {
                     throw new Error('No extract');
                 }
