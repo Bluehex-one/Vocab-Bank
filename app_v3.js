@@ -520,10 +520,20 @@ document.addEventListener('DOMContentLoaded', () => {
                             
                             <div class="custom-def-view hidden" style="margin-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem;">
                                 <div class="custom-def-display"></div>
-                                    <button class="btn-primary save-manual-def-btn" style="margin-top: 0.5rem; width: 100%;">Save Custom</button>
+                                <div class="custom-media-display media-gallery"></div>
+                                
+                                <div class="manual-def-form hidden" style="margin-top: 1rem;">
+                                    <textarea class="manual-def-input custom-textarea" rows="4" placeholder="Type your custom definition here... (Markdown supported)"></textarea>
+                                    <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                                        <button class="btn-primary save-manual-def-btn">Save</button>
+                                        <button class="btn-secondary add-media-btn">Add Media URL</button>
+                                    </div>
                                 </div>
+                                
+                                <button class="btn-secondary toggle-manual-def-btn" style="margin-top: 1rem; width: 100%; font-size: 0.85rem; padding: 0.5rem;">Edit Custom Definition</button>
                             </div>
                         </div>
+                    </div>
                     </div>
                 `;
                 
