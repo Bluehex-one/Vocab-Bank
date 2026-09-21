@@ -23,6 +23,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const subfolderButtons = document.getElementById('subfolder-buttons');
     const addSubfolderBtn = document.getElementById('add-subfolder-btn');
     const deleteFolderBtn = document.getElementById('delete-folder-btn');
+    const exportFolderBtn = document.getElementById('export-folder-btn');
+    
+    // Dialog Elements
+    const customDialog = document.getElementById('custom-dialog-modal');
+    const dialogTitle = document.getElementById('dialog-title');
+    const dialogMessage = document.getElementById('dialog-message');
+    const dialogInput = document.getElementById('dialog-input');
+    const dialogCancelBtn = document.getElementById('dialog-cancel-btn');
+    const dialogConfirmBtn = document.getElementById('dialog-confirm-btn');
     
     // Backup Elements
     const exportBtn = document.getElementById('export-backup-btn');
@@ -57,6 +66,70 @@ document.addEventListener('DOMContentLoaded', () => {
         saveVocabulary();
     } else {
         vocabulary = { ...defaultStructure, ...vocabulary };
+    }
+    
+    // Migration for aiDefinitions (string to object)
+    Object.keys(aiDefinitions).forEach(key => {
+        if (typeof aiDefinitions[key] === 'string') {
+            aiDefinitions[key] = { text: aiDefinitions[key], img: null };
+        }
+    });
+    localStorage.setItem('ai-definitions', JSON.stringify(aiDefinitions));
+
+    function showCustomDialog({ title, message = '', isInput = false, confirmText = 'Confirm', danger = false }, callback) {
+        dialogTitle.textContent = title;
+        
+        if (message) {
+            dialogMessage.textContent = message;
+            dialogMessage.classList.remove('hidden');
+        } else {
+            dialogMessage.classList.add('hidden');
+        }
+        
+        if (isInput) {
+            dialogInput.classList.remove('hidden');
+            dialogInput.value = '';
+            dialogInput.focus();
+        } else {
+            dialogInput.classList.add('hidden');
+        }
+        
+        dialogConfirmBtn.textContent = confirmText;
+        if (danger) {
+            dialogConfirmBtn.className = 'btn-danger';
+        } else {
+            dialogConfirmBtn.className = 'btn-primary';
+        }
+        
+        customDialog.classList.remove('hidden');
+        
+        // Remove old event listeners
+        const newConfirmBtn = dialogConfirmBtn.cloneNode(true);
+        dialogConfirmBtn.parentNode.replaceChild(newConfirmBtn, dialogConfirmBtn);
+        const newCancelBtn = dialogCancelBtn.cloneNode(true);
+        dialogCancelBtn.parentNode.replaceChild(newCancelBtn, dialogCancelBtn);
+        
+        newConfirmBtn.addEventListener('click', () => {
+            const val = isInput ? dialogInput.value : true;
+            customDialog.classList.add('hidden');
+            callback(val);
+        });
+        
+        newCancelBtn.addEventListener('click', () => {
+            customDialog.classList.add('hidden');
+            callback(null);
+        });
+        
+        // Setup Enter key for input
+        if (isInput) {
+            const handleEnter = (e) => {
+                if (e.key === 'Enter') {
+                    newConfirmBtn.click();
+                    dialogInput.removeEventListener('keydown', handleEnter);
+                }
+            };
+            dialogInput.addEventListener('keydown', handleEnter);
+        }
     }
 
     // Initialize
@@ -111,59 +184,100 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     addFolderBtn.addEventListener('click', () => {
-        const folderName = prompt('Enter the name for the new root folder:');
-        if (folderName && folderName.trim()) {
-            const safeId = folderName.trim().toLowerCase().replace(/[^a-z0-9]/g, '-');
-            if (!vocabulary[safeId]) {
-                vocabulary[safeId] = [];
-                saveVocabulary();
-                renderFolders();
-                switchSection(safeId);
-                sectionSelect.value = safeId;
-            } else {
-                alert('A folder with that name already exists!');
+        showCustomDialog({
+            title: 'New Root Folder',
+            isInput: true
+        }, (folderName) => {
+            if (folderName && folderName.trim()) {
+                const safeId = folderName.trim().toLowerCase().replace(/[^a-z0-9]/g, '-');
+                if (!vocabulary[safeId]) {
+                    vocabulary[safeId] = [];
+                    saveVocabulary();
+                    renderFolders();
+                    switchSection(safeId);
+                    sectionSelect.value = safeId;
+                } else {
+                    showCustomDialog({ title: 'Error', message: 'A folder with that name already exists!' }, () => {});
+                }
             }
-        }
+        });
     });
     
     addSubfolderBtn.addEventListener('click', () => {
-        const folderName = prompt('Enter the name for the new subfolder:');
-        if (folderName && folderName.trim()) {
-            const safeId = folderName.trim().toLowerCase().replace(/[^a-z0-9]/g, '-');
-            const newPath = `${currentSection}/${safeId}`;
-            if (!vocabulary[newPath]) {
-                vocabulary[newPath] = [];
-                saveVocabulary();
-                renderFolders();
-                switchSection(newPath);
-                sectionSelect.value = newPath;
-            } else {
-                alert('A subfolder with that name already exists here!');
+        showCustomDialog({
+            title: 'New Subfolder',
+            isInput: true
+        }, (folderName) => {
+            if (folderName && folderName.trim()) {
+                const safeId = folderName.trim().toLowerCase().replace(/[^a-z0-9]/g, '-');
+                const newPath = `${currentSection}/${safeId}`;
+                if (!vocabulary[newPath]) {
+                    vocabulary[newPath] = [];
+                    saveVocabulary();
+                    renderFolders();
+                    switchSection(newPath);
+                    sectionSelect.value = newPath;
+                } else {
+                    showCustomDialog({ title: 'Error', message: 'A subfolder with that name already exists here!' }, () => {});
+                }
             }
-        }
+        });
     });
     
     deleteFolderBtn.addEventListener('click', () => {
-        const confirmDelete = confirm(`Are you sure you want to delete the folder "${formatSegmentToPrettyName(currentSection.split('/').pop())}" and ALL of its subfolders and words? This cannot be undone.`);
-        if (confirmDelete) {
-            // Find all paths that start with the current section or are exactly the current section
-            const pathsToDelete = Object.keys(vocabulary).filter(p => p === currentSection || p.startsWith(currentSection + '/'));
-            
-            pathsToDelete.forEach(p => {
-                delete vocabulary[p];
-            });
-            
-            // If we deleted everything, recreate a default folder
-            if (Object.keys(vocabulary).length === 0) {
-                vocabulary = { 'maths': [] };
+        showCustomDialog({
+            title: 'Delete Folder',
+            message: `Are you sure you want to delete "${formatSegmentToPrettyName(currentSection.split('/').pop())}" and ALL of its subfolders and words? This cannot be undone.`,
+            confirmText: 'Delete',
+            danger: true
+        }, (confirmDelete) => {
+            if (confirmDelete) {
+                const pathsToDelete = Object.keys(vocabulary).filter(p => p === currentSection || p.startsWith(currentSection + '/'));
+                pathsToDelete.forEach(p => delete vocabulary[p]);
+                
+                if (Object.keys(vocabulary).length === 0) {
+                    vocabulary = { 'maths': [] };
+                }
+                
+                saveVocabulary();
+                renderFolders();
+                currentSection = Object.keys(vocabulary)[0];
+                switchSection(currentSection);
+                sectionSelect.value = currentSection;
             }
-            
-            saveVocabulary();
-            renderFolders();
-            currentSection = Object.keys(vocabulary)[0];
-            switchSection(currentSection);
-            sectionSelect.value = currentSection;
-        }
+        });
+    });
+
+    exportFolderBtn.addEventListener('click', () => {
+        // Filter everything for current folder tree
+        const folderVocab = {};
+        const folderCustomDef = {};
+        const folderAiDef = {};
+        
+        const pathsToExport = Object.keys(vocabulary).filter(p => p === currentSection || p.startsWith(currentSection + '/'));
+        
+        pathsToExport.forEach(p => {
+            folderVocab[p] = vocabulary[p];
+            vocabulary[p].forEach(word => {
+                if (customDefinitions[word]) folderCustomDef[word] = customDefinitions[word];
+                if (aiDefinitions[word]) folderAiDef[word] = aiDefinitions[word];
+            });
+        });
+        
+        const dataToExport = {
+            vocabulary: folderVocab,
+            customDefinitions: folderCustomDef,
+            aiDefinitions: folderAiDef
+        };
+        
+        const safeName = currentSection.replace(/\//g, '-');
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dataToExport, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", `vocab-vault-${safeName}.json`);
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
     });
 
     sectionSelect.addEventListener('change', (e) => {
@@ -383,8 +497,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         
                         <div class="def-content-wrapper hidden">
                             <div class="ai-def-view">
-                                <img class="inline-def-image hidden" src="" alt="${word}">
+                                <img class="inline-def-image hidden" src="" alt="${word}" style="width: 100%; max-width: 300px; border-radius: 8px; margin-bottom: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
                                 <div class="inline-def-content"></div>
+                                <button class="btn-secondary tune-ai-btn" style="margin-top: 1rem; width: 100%; font-size: 0.85rem; padding: 0.5rem;">✨ Tune AI Definition</button>
                             </div>
                             
                             <div class="custom-def-view hidden" style="margin-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem;">
@@ -410,6 +525,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const manualDefForm = card.querySelector('.manual-def-form');
                 const manualDefInput = card.querySelector('.manual-def-input');
                 const saveManualDefBtn = card.querySelector('.save-manual-def-btn');
+                const tuneAiBtn = card.querySelector('.tune-ai-btn');
                 
                 const aiToggleBtn = card.querySelector('.ai-toggle-btn');
                 const customToggleBtn = card.querySelector('.custom-toggle-btn');
@@ -452,6 +568,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 aiToggleBtn.addEventListener('click', showAiView);
                 customToggleBtn.addEventListener('click', showCustomView);
                 
+                tuneAiBtn.addEventListener('click', () => {
+                    showCustomDialog({
+                        title: 'Tune AI Definition',
+                        message: 'Give Gemini some instructions (e.g. "Explain it like I am 5" or "Provide examples").',
+                        isInput: true,
+                        confirmText: 'Generate'
+                    }, (instructions) => {
+                        if (instructions) {
+                            activeDefinitions[word] = false; // force re-fetch
+                            toggleDefinition(word, currentSection, card, instructions);
+                        }
+                    });
+                });
+                
                 toggleManualDefBtn.addEventListener('click', () => {
                     manualDefForm.classList.toggle('hidden');
                     if (!manualDefForm.classList.contains('hidden')) {
@@ -484,7 +614,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderVocabulary();
     }
 
-    async function toggleDefinition(word, section, cardEl) {
+    async function toggleDefinition(word, section, cardEl, extraInstructions = null) {
         const safeWordId = word.replace(/\s+/g, '-');
         const container = cardEl.querySelector(`#def-container-${safeWordId}`);
         const loading = cardEl.querySelector('.def-loading');
@@ -523,12 +653,16 @@ document.addEventListener('DOMContentLoaded', () => {
         // Always make custom view accessible immediately
         customDefView.classList.add('hidden'); // hidden by default until toggle clicked
         
-        // If we have cached AI definition, use it
-        if (aiDefinitions[word]) {
+        // If we have cached AI definition and no extra instructions, use it
+        if (aiDefinitions[word] && !extraInstructions) {
             contentWrapper.classList.remove('hidden');
             loading.classList.add('hidden');
             const aiBadge = `<span class="ai-badge" style="font-size: 0.7rem; margin-right: 0.5rem; padding: 0.1rem 0.4rem; vertical-align: top;">AI</span>`;
-            setDefinitionHTML(aiDefinitions[word], aiBadge);
+            setDefinitionHTML(aiDefinitions[word].text, aiBadge);
+            if (aiDefinitions[word].img) {
+                imgEl.src = aiDefinitions[word].img;
+                imgEl.classList.remove('hidden');
+            }
             return;
         }
         
@@ -537,7 +671,7 @@ document.addEventListener('DOMContentLoaded', () => {
         contentWrapper.classList.add('hidden');
         imgEl.classList.add('hidden');
         
-        async function fetchGeminiDefinition(word, section, apiKey) {
+        async function fetchGeminiDefinition(word, section, apiKey, extra = null) {
             const rootFolder = section.split('/')[0].toLowerCase();
             let languageInstruction = "English";
             if (rootFolder.includes('chinese')) languageInstruction = "Chinese (with pinyin if applicable)";
@@ -547,7 +681,10 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (rootFolder.includes('japanese')) languageInstruction = "Japanese (with romaji if applicable)";
             else if (rootFolder.includes('korean')) languageInstruction = "Korean";
 
-            const prompt = `Define the word '${word}' strictly in the context of the subject: ${section.replace(/\//g, ' > ')}. Use appropriate academic terminology and jargon for this subject. The definition MUST be written in ${languageInstruction}. Keep it clear and concise, maximum 2 sentences.`;
+            let prompt = `Define the word '${word}' strictly in the context of the subject: ${section.replace(/\//g, ' > ')}. Use appropriate academic terminology and jargon for this subject. The definition MUST be written in ${languageInstruction}. Keep it clear and concise, maximum 2 sentences.`;
+            if (extra) {
+                prompt += ` Additionally, follow these instructions: ${extra}`;
+            }
             
             const body = JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] });
             
@@ -616,14 +753,35 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (apiKey) {
                 // Use auto-discovering Gemini API
-                const definitionText = await fetchGeminiDefinition(word, section, apiKey);
+                const definitionText = await fetchGeminiDefinition(word, section, apiKey, extraInstructions);
+                
+                // Fetch wikipedia thumbnail asynchronously in background
+                let wikiImg = null;
+                try {
+                    let lang = 'en';
+                    const baseSection = section.split('/')[0];
+                    if (baseSection === 'chinese') lang = 'zh';
+                    if (baseSection === 'french') lang = 'fr';
+                    
+                    const wikiResp = await fetch(`https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(word)}`);
+                    if (wikiResp.ok) {
+                        const wikiData = await wikiResp.json();
+                        if (wikiData.thumbnail && wikiData.thumbnail.source) {
+                            wikiImg = wikiData.thumbnail.source;
+                        }
+                    }
+                } catch(e) {}
                 
                 // Cache it!
-                aiDefinitions[word] = definitionText;
+                aiDefinitions[word] = { text: definitionText, img: wikiImg };
                 localStorage.setItem('ai-definitions', JSON.stringify(aiDefinitions));
                 
                 const aiBadge = `<span class="ai-badge" style="font-size: 0.7rem; margin-right: 0.5rem; padding: 0.1rem 0.4rem; vertical-align: top;">AI</span>`;
                 setDefinitionHTML(definitionText, aiBadge);
+                if (wikiImg) {
+                    imgEl.src = wikiImg;
+                    imgEl.classList.remove('hidden');
+                }
             } else {
                 // Fallback to Wikipedia API
                 let lang = 'en';
@@ -640,15 +798,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await response.json();
                 
                 if (data.extract) {
+                    let wikiImg = data.thumbnail ? data.thumbnail.source : null;
                     // Cache Wikipedia result as well to save network requests
-                    aiDefinitions[word] = data.extract;
+                    aiDefinitions[word] = { text: data.extract, img: wikiImg };
                     localStorage.setItem('ai-definitions', JSON.stringify(aiDefinitions));
                     
                     setDefinitionHTML(data.extract);
                     
                     // Show image if available!
-                    if (data.thumbnail && data.thumbnail.source) {
-                        imgEl.src = data.thumbnail.source;
+                    if (wikiImg) {
+                        imgEl.src = wikiImg;
                         imgEl.classList.remove('hidden');
                     }
                 } else {
