@@ -269,7 +269,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const prompt = `Write a short dictionary definition for the word '${word}' in the context of ${section}. Make it clear and concise, maximum 2 sentences.`;
             const body = JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] });
             
-            let modelName = localStorage.getItem('gemini-model-name') || 'models/gemini-1.5-flash';
+            let modelName = localStorage.getItem('gemini-model-name-v2') || 'models/gemini-3.6-flash';
             if (!modelName.startsWith('models/')) modelName = 'models/' + modelName;
 
             let response = await fetch(`https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent?key=${apiKey}`, {
@@ -293,7 +293,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         
                         if (validModel) {
                             modelName = validModel.name;
-                            localStorage.setItem('gemini-model-name', modelName);
+                            localStorage.setItem('gemini-model-name-v2', modelName);
                             // Retry with valid model
                             response = await fetch(`https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent?key=${apiKey}`, {
                                 method: 'POST',
