@@ -6,11 +6,21 @@
     <title>AI Vocab Vault</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- Markdown & MathJax support -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        window.MathJax = {
+            tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+            svg: { fontCache: 'global' },
+            startup: { typeset: false } // We'll trigger it manually
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
 <body>
-    <div class="background-elements">
-        <div class="glow-orb orb-1"></div>
-        <div class="glow-orb orb-2"></div>
+    <div class="bg-animation">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
     </div>
     
     <main class="container">
@@ -29,12 +39,7 @@
             <form id="add-word-form">
                 <div class="input-group">
                     <select id="section-select" class="section-dropdown">
-                        <option value="maths">Maths</option>
-                        <option value="chinese">Chinese</option>
-                        <option value="french">French</option>
-                        <option value="humanities">Humanities</option>
-                        <option value="science">Science</option>
-                        <option value="digital-technology">Digital Technology</option>
+                        <!-- Options injected by JS -->
                     </select>
                     <input type="text" id="word-input" placeholder="Enter a new word..." required autocomplete="off">
                     <button type="submit" class="btn-primary">Add Word</button>
@@ -44,12 +49,16 @@
 
         <!-- Navigation Tabs -->
         <nav class="tabs-nav" id="tabs-nav">
-            <button class="tab-btn active" data-section="maths">Maths</button>
-            <button class="tab-btn" data-section="chinese">Chinese</button>
-            <button class="tab-btn" data-section="french">French</button>
-            <button class="tab-btn" data-section="humanities">Humanities</button>
-            <button class="tab-btn" data-section="science">Science</button>
-            <button class="tab-btn" data-section="digital-technology">Digital Tech</button>
+            <div id="tabs-container" style="display: flex; gap: 1rem; overflow-x: auto; flex: 1;">
+                <!-- Tabs injected by JS -->
+            </div>
+            <button id="add-folder-btn" class="add-folder-btn" title="Create New Folder">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                New Folder
+            </button>
         </nav>
 
         <section class="vocabulary-section">
@@ -65,7 +74,7 @@
 
     <!-- Settings Modal -->
     <div id="settings-modal" class="modal hidden">
-        <div class="modal-content glass-panel">
+        <div class="modal-content glass-panel" style="max-width: 500px;">
             <button class="close-btn" id="close-settings">&times;</button>
             <h2 style="margin-bottom: 1rem; color: var(--primary);">API Settings</h2>
             <p style="margin-bottom: 1.5rem; color: var(--text-muted); font-size: 0.95rem;">
@@ -73,9 +82,21 @@
             </p>
             <div class="input-group" style="flex-direction: column;">
                 <input type="password" id="api-key-input" placeholder="Paste your API key here..." style="margin-bottom: 1rem;">
-                <button id="save-api-key" class="btn-primary">Save Settings</button>
+                <button id="save-api-key" class="btn-primary" style="width: 100%;">Save Settings</button>
             </div>
             <div id="settings-status" class="hidden" style="margin-top: 1rem; color: #34d399; font-size: 0.9rem; text-align: center;">Settings saved!</div>
+
+            <hr style="border: 1px solid var(--glass-border); margin: 2rem 0;">
+
+            <h2 style="margin-bottom: 1rem; color: var(--primary);">Data Backup</h2>
+            <p style="margin-bottom: 1.5rem; color: var(--text-muted); font-size: 0.95rem;">
+                Export your vocabulary to a JSON file to keep it safe, or restore from a previous backup.
+            </p>
+            <div class="input-group" style="display: flex; gap: 1rem;">
+                <button id="export-backup-btn" class="btn-primary" style="flex: 1; background: rgba(52, 211, 153, 0.2); border-color: rgba(52, 211, 153, 0.5); color: #34d399;">Export Backup</button>
+                <button id="import-backup-btn" class="btn-primary" style="flex: 1; background: rgba(99, 102, 241, 0.2); border-color: rgba(99, 102, 241, 0.5); color: #a5b4fc;">Import Backup</button>
+                <input type="file" id="import-file-input" accept=".json" class="hidden">
+            </div>
         </div>
     </div>
 

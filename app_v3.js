@@ -15,6 +15,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveApiKeyBtn = document.getElementById('save-api-key');
     const settingsStatus = document.getElementById('settings-status');
 
+    // DOM Elements Additions
+    const tabsContainer = document.getElementById('tabs-container');
+    const addFolderBtn = document.getElementById('add-folder-btn');
+    
+    // Backup Elements
+    const exportBtn = document.getElementById('export-backup-btn');
+    const importBtn = document.getElementById('import-backup-btn');
+    const importFileInput = document.getElementById('import-file-input');
+
     // Default sections structure
     const defaultStructure = {
         'maths': [],
@@ -45,6 +54,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Initialize
+    if (!vocabulary[currentSection]) {
+        currentSection = Object.keys(vocabulary)[0];
+    }
+    renderFolders();
     renderVocabulary();
 
     // Event Listeners
@@ -66,11 +79,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    tabsNav.addEventListener('click', (e) => {
+    tabsContainer.addEventListener('click', (e) => {
         if (e.target.classList.contains('tab-btn')) {
             const section = e.target.getAttribute('data-section');
             switchSection(section);
             sectionSelect.value = section;
+        }
+    });
+
+    addFolderBtn.addEventListener('click', () => {
+        const folderName = prompt('Enter the name for the new folder:');
+        if (folderName && folderName.trim()) {
+            const safeId = folderName.trim().toLowerCase().replace(/[^a-z0-9]/g, '-');
+            if (!vocabulary[safeId]) {
+                vocabulary[safeId] = [];
+                saveVocabulary();
+                renderFolders();
+                switchSection(safeId);
+                sectionSelect.value = safeId;
+            } else {
+                alert('A folder with that name already exists!');
+            }
         }
     });
 
@@ -106,9 +135,80 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 1500);
     });
 
+    // Backup & Restore Logic
+    exportBtn.addEventListener('click', () => {
+        const dataToExport = {
+            vocabulary: vocabulary,
+            customDefinitions: customDefinitions
+        };
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dataToExport, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", "vocab-vault-backup.json");
+        document.body.appendChild(downloadAnchorNode); // required for firefox
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    });
+
+    importBtn.addEventListener('click', () => {
+        importFileInput.click();
+    });
+
+    importFileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const importedData = JSON.parse(e.target.result);
+                if (importedData.vocabulary) {
+                    vocabulary = importedData.vocabulary;
+                    saveVocabulary();
+                }
+                if (importedData.customDefinitions) {
+                    customDefinitions = importedData.customDefinitions;
+                    localStorage.setItem('custom-definitions', JSON.stringify(customDefinitions));
+                }
+                renderFolders();
+                currentSection = Object.keys(vocabulary)[0];
+                switchSection(currentSection);
+                alert("Backup restored successfully!");
+                settingsModal.classList.add('hidden');
+            } catch (err) {
+                alert("Error parsing backup file. Make sure it is a valid Vocab Vault JSON file.");
+                console.error(err);
+            }
+        };
+        reader.readAsText(file);
+    });
+
     // Functions
     function saveVocabulary() {
         localStorage.setItem('vocabulary-v2', JSON.stringify(vocabulary));
+    }
+
+    function renderFolders() {
+        tabsContainer.innerHTML = '';
+        sectionSelect.innerHTML = '';
+        
+        Object.keys(vocabulary).forEach(section => {
+            const prettyName = section.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+            
+            // Add to tabs
+            const tabBtn = document.createElement('button');
+            tabBtn.className = `tab-btn ${section === currentSection ? 'active' : ''}`;
+            tabBtn.setAttribute('data-section', section);
+            tabBtn.textContent = prettyName;
+            tabsContainer.appendChild(tabBtn);
+            
+            // Add to dropdown
+            const option = document.createElement('option');
+            option.value = section;
+            option.textContent = prettyName;
+            sectionSelect.appendChild(option);
+        });
+        sectionSelect.value = currentSection;
     }
 
     function switchSection(section) {
@@ -251,11 +351,23 @@ document.addEventListener('DOMContentLoaded', () => {
         container.classList.remove('hidden');
         activeDefinitions[word] = true;
         
+        // Helper to set markdown/math HTML
+        const setDefinitionHTML = (text, prefixHTML = '') => {
+            if (window.marked) {
+                contentDiv.innerHTML = prefixHTML + window.marked.parse(text);
+            } else {
+                contentDiv.innerHTML = prefixHTML + text;
+            }
+            if (window.MathJax) {
+                window.MathJax.typesetPromise([contentDiv]).catch(err => console.error(err));
+            }
+        };
+        
         // If there's a custom definition, show it immediately
         if (customDefinitions[word]) {
             contentWrapper.classList.remove('hidden');
             loading.classList.add('hidden');
-            contentDiv.innerHTML = `<strong>(Custom Definition)</strong><br><br>${customDefinitions[word]}`;
+            setDefinitionHTML(customDefinitions[word], '<strong>(Custom Definition)</strong><br><br>');
             imgEl.classList.add('hidden');
             return;
         }
@@ -335,7 +447,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (apiKey) {
                 // Use auto-discovering Gemini API
                 const definitionText = await fetchGeminiDefinition(word, section, apiKey);
-                contentDiv.innerHTML = `<span class="ai-badge" style="font-size: 0.7rem; margin-right: 0.5rem; padding: 0.1rem 0.4rem;">AI</span>` + definitionText;
+                const aiBadge = `<span class="ai-badge" style="font-size: 0.7rem; margin-right: 0.5rem; padding: 0.1rem 0.4rem; vertical-align: top;">AI</span>`;
+                setDefinitionHTML(definitionText, aiBadge);
             } else {
                 // Fallback to Wikipedia API
                 let lang = 'en';
@@ -351,7 +464,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await response.json();
                 
                 if (data.extract) {
-                    contentDiv.innerHTML = data.extract;
+                    setDefinitionHTML(data.extract);
                     
                     // Show image if available!
                     if (data.thumbnail && data.thumbnail.source) {
@@ -367,9 +480,9 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error(error);
             const apiKey = localStorage.getItem('gemini-api-key');
             if (apiKey) {
-                contentDiv.innerHTML = `<em style="color: #ef4444;">(API Error)</em> <br><br> The Gemini API failed to respond properly. Error: ${error.message}. Please double check your API key in the settings.`;
+                setDefinitionHTML(`The Gemini API failed to respond properly. Error: ${error.message}. Please double check your API key in the settings.`, `<em style="color: #ef4444;">(API Error)</em> <br><br>`);
             } else {
-                contentDiv.innerHTML = `<em>(No automatic definition found)</em> <br><br> As an AI, I understand that <strong>"${word}"</strong> is a vocabulary term in your ${section} studies, but I couldn't find a good automatic definition for it. You can manually edit the definition below!`;
+                setDefinitionHTML(`As an AI, I understand that **"${word}"** is a vocabulary term in your ${section} studies, but I couldn't find a good automatic definition for it. You can manually edit the definition below!`, `<em>(No automatic definition found)</em> <br><br>`);
             }
         } finally {
             loading.classList.add('hidden');

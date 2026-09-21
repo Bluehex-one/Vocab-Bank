@@ -513,3 +513,33 @@ input:focus {
     transform: rotate(45deg);
 }
 
+
+.add-folder-btn {
+    background: transparent;
+    border: 1px dashed var(--glass-border);
+    color: var(--text-muted);
+    padding: 0.8rem 1.5rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+}
+.add-folder-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-light);
+    border-color: var(--text-light);
+}
+mjx-container {
+    color: var(--primary);
+    background: rgba(99, 102, 241, 0.1);
+    padding: 2px 4px;
+    border-radius: 4px;
+}
+.inline-def p {
+    margin-bottom: 0.5rem;
+}
+
