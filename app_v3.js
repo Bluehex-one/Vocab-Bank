@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const breadcrumbs = document.getElementById('breadcrumbs');
     const subfolderButtons = document.getElementById('subfolder-buttons');
     const addSubfolderBtn = document.getElementById('add-subfolder-btn');
+    const deleteFolderBtn = document.getElementById('delete-folder-btn');
     
     // Backup Elements
     const exportBtn = document.getElementById('export-backup-btn');
@@ -139,6 +140,29 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 alert('A subfolder with that name already exists here!');
             }
+        }
+    });
+    
+    deleteFolderBtn.addEventListener('click', () => {
+        const confirmDelete = confirm(`Are you sure you want to delete the folder "${formatSegmentToPrettyName(currentSection.split('/').pop())}" and ALL of its subfolders and words? This cannot be undone.`);
+        if (confirmDelete) {
+            // Find all paths that start with the current section or are exactly the current section
+            const pathsToDelete = Object.keys(vocabulary).filter(p => p === currentSection || p.startsWith(currentSection + '/'));
+            
+            pathsToDelete.forEach(p => {
+                delete vocabulary[p];
+            });
+            
+            // If we deleted everything, recreate a default folder
+            if (Object.keys(vocabulary).length === 0) {
+                vocabulary = { 'maths': [] };
+            }
+            
+            saveVocabulary();
+            renderFolders();
+            currentSection = Object.keys(vocabulary)[0];
+            switchSection(currentSection);
+            sectionSelect.value = currentSection;
         }
     });
 
@@ -514,7 +538,17 @@ document.addEventListener('DOMContentLoaded', () => {
         imgEl.classList.add('hidden');
         
         async function fetchGeminiDefinition(word, section, apiKey) {
-            const prompt = `Write a short dictionary definition for the word '${word}' in the context of ${section}. Make it clear and concise, maximum 2 sentences.`;
+            const rootFolder = section.split('/')[0].toLowerCase();
+            let languageInstruction = "English";
+            if (rootFolder.includes('chinese')) languageInstruction = "Chinese (with pinyin if applicable)";
+            else if (rootFolder.includes('french')) languageInstruction = "French";
+            else if (rootFolder.includes('spanish')) languageInstruction = "Spanish";
+            else if (rootFolder.includes('german')) languageInstruction = "German";
+            else if (rootFolder.includes('japanese')) languageInstruction = "Japanese (with romaji if applicable)";
+            else if (rootFolder.includes('korean')) languageInstruction = "Korean";
+
+            const prompt = `Define the word '${word}' strictly in the context of the subject: ${section.replace(/\//g, ' > ')}. Use appropriate academic terminology and jargon for this subject. The definition MUST be written in ${languageInstruction}. Keep it clear and concise, maximum 2 sentences.`;
+            
             const body = JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] });
             
             let modelName = localStorage.getItem('gemini-model-name-v2') || 'models/gemini-3.6-flash';
