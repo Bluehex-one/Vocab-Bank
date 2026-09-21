@@ -265,43 +265,77 @@ document.addEventListener('DOMContentLoaded', () => {
         contentWrapper.classList.add('hidden');
         imgEl.classList.add('hidden');
         
+        async function fetchGeminiDefinition(word, section, apiKey) {
+            const prompt = `Write a short dictionary definition for the word '${word}' in the context of ${section}. Make it clear and concise, maximum 2 sentences.`;
+            const body = JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] });
+            
+            let modelName = localStorage.getItem('gemini-model-name') || 'models/gemini-1.5-flash';
+            if (!modelName.startsWith('models/')) modelName = 'models/' + modelName;
+
+            let response = await fetch(`https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent?key=${apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: body
+            });
+
+            if (!response.ok) {
+                let errorData = {};
+                try { errorData = await response.clone().json(); } catch(e){}
+                
+                const isNotFound = response.status === 404 || (errorData.error && errorData.error.message && errorData.error.message.includes('not found'));
+                
+                if (isNotFound) {
+                    // Auto-discover models
+                    const modelsResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+                    if (modelsResp.ok) {
+                        const modelsData = await modelsResp.json();
+                        const validModel = modelsData.models.find(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent') && m.name.includes('gemini'));
+                        
+                        if (validModel) {
+                            modelName = validModel.name;
+                            localStorage.setItem('gemini-model-name', modelName);
+                            // Retry with valid model
+                            response = await fetch(`https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent?key=${apiKey}`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: body
+                            });
+                        } else {
+                            const available = modelsData.models ? modelsData.models.map(m=>m.name).join(', ') : 'None';
+                            throw new Error(`No compatible text-generation models found for your API key. Available models: ${available}`);
+                        }
+                    }
+                }
+            }
+
+            if (!response.ok) {
+                let errorMessage = 'API Error';
+                try {
+                    const errorData = await response.json();
+                    if (errorData.error && errorData.error.message) {
+                        errorMessage = errorData.error.message;
+                    }
+                } catch (e) {
+                    errorMessage = `HTTP Error ${response.status}: ${response.statusText}`;
+                }
+                throw new Error(errorMessage);
+            }
+
+            const data = await response.json();
+            if (data.candidates && data.candidates[0].content.parts[0].text) {
+                return data.candidates[0].content.parts[0].text;
+            } else {
+                throw new Error('No valid response from model');
+            }
+        }
+
         try {
             const apiKey = localStorage.getItem('gemini-api-key');
             
             if (apiKey) {
-                // Use Gemini API
-                const prompt = `Write a short dictionary definition for the word '${word}' in the context of ${section}. Make it clear and concise, maximum 2 sentences.`;
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [{ text: prompt }]
-                        }]
-                    })
-                });
-                
-                if (!response.ok) {
-                    let errorMessage = 'API Error';
-                    try {
-                        const errorData = await response.json();
-                        if (errorData.error && errorData.error.message) {
-                            errorMessage = errorData.error.message;
-                        }
-                    } catch (e) {
-                        errorMessage = `HTTP Error ${response.status}: ${response.statusText}`;
-                    }
-                    throw new Error(errorMessage);
-                }
-                const data = await response.json();
-                
-                if (data.candidates && data.candidates[0].content.parts[0].text) {
-                    contentDiv.innerHTML = `<span class="ai-badge" style="font-size: 0.7rem; margin-right: 0.5rem; padding: 0.1rem 0.4rem;">AI</span>` + data.candidates[0].content.parts[0].text;
-                } else {
-                    throw new Error('No valid response');
-                }
+                // Use auto-discovering Gemini API
+                const definitionText = await fetchGeminiDefinition(word, section, apiKey);
+                contentDiv.innerHTML = `<span class="ai-badge" style="font-size: 0.7rem; margin-right: 0.5rem; padding: 0.1rem 0.4rem;">AI</span>` + definitionText;
             } else {
                 // Fallback to Wikipedia API
                 let lang = 'en';
