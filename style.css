@@ -515,10 +515,10 @@ input:focus {
 
 
 .add-folder-btn {
-    background: transparent;
-    border: 1px dashed var(--glass-border);
-    color: var(--text-muted);
-    padding: 0.8rem 1.5rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    color: var(--text-light);
+    padding: 0.8rem 1.2rem;
     border-radius: 8px;
     cursor: pointer;
     font-weight: 600;
@@ -529,10 +529,57 @@ input:focus {
     white-space: nowrap;
 }
 .add-folder-btn:hover {
-    background: rgba(255, 255, 255, 0.05);
-    color: var(--text-light);
-    border-color: var(--text-light);
+    background: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    border-color: rgba(255, 255, 255, 0.3);
 }
+.subfolder-btn {
+    background: rgba(99, 102, 241, 0.1);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    color: #a5b4fc;
+    padding: 0.4rem 1rem;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+}
+.subfolder-btn:hover {
+    background: rgba(99, 102, 241, 0.2);
+    border-color: rgba(99, 102, 241, 0.5);
+}
+.breadcrumb-link {
+    cursor: pointer;
+    transition: color 0.2s;
+}
+.breadcrumb-link:hover {
+    color: var(--primary);
+    text-decoration: underline;
+}
+.def-toggles {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--glass-border);
+    padding-bottom: 0.5rem;
+}
+.def-toggle-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    cursor: pointer;
+    padding: 0.3rem 0.6rem;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+.def-toggle-btn:hover {
+    background: rgba(255,255,255,0.05);
+}
+.def-toggle-btn.active {
+    color: var(--primary);
+    background: rgba(99, 102, 241, 0.1);
+}
+
 mjx-container {
     color: var(--primary);
     background: rgba(99, 102, 241, 0.1);
