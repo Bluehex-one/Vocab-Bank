@@ -302,9 +302,24 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Settings logic
+    const updateApiKeyInputState = () => {
+        if (aiProviderSelect.value === 'wikipedia') {
+            apiKeyInput.disabled = true;
+            apiKeyInput.style.opacity = '0.5';
+            apiKeyInput.style.cursor = 'not-allowed';
+        } else {
+            apiKeyInput.disabled = false;
+            apiKeyInput.style.opacity = '1';
+            apiKeyInput.style.cursor = 'text';
+        }
+    };
+
+    aiProviderSelect.addEventListener('change', updateApiKeyInputState);
+
     settingsBtn.addEventListener('click', () => {
         apiKeyInput.value = localStorage.getItem('gemini-api-key') || '';
         aiProviderSelect.value = localStorage.getItem('ai-provider') || 'gemini';
+        updateApiKeyInputState();
         settingsStatus.classList.add('hidden');
         settingsModal.classList.remove('hidden');
     });
