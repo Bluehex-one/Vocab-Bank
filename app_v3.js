@@ -572,21 +572,46 @@ document.addEventListener('DOMContentLoaded', () => {
                 const renderMedia = (urls, container) => {
                     container.innerHTML = '';
                     if (!urls || urls.length === 0) return;
-                    urls.forEach(url => {
+                    urls.forEach((url, index) => {
                         const item = document.createElement('div');
                         item.className = 'media-item';
+                        
+                        let contentHtml = '';
                         if (url.includes('youtube.com/watch') || url.includes('youtu.be/')) {
                             let videoId = '';
                             if (url.includes('youtube.com')) videoId = new URL(url).searchParams.get('v');
                             if (url.includes('youtu.be')) videoId = url.split('youtu.be/')[1].split('?')[0];
-                            item.innerHTML = `<iframe src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe>`;
+                            contentHtml = `<iframe src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe>`;
                         } else if (url.match(/\\.(jpeg|jpg|gif|png)$/i)) {
-                            item.innerHTML = `<img src="${url}" alt="Attachment">`;
+                            contentHtml = `<img src="${url}" alt="Attachment">`;
                         } else if (url.match(/\\.(mp4|webm)$/i)) {
-                            item.innerHTML = `<video src="${url}" controls></video>`;
+                            contentHtml = `<video src="${url}" controls></video>`;
                         } else {
-                            item.innerHTML = `<a href="${url}" target="_blank" style="padding: 1rem; display: block; color: var(--primary);">Open Link</a>`;
+                            contentHtml = `<a href="${url}" target="_blank" style="padding: 1rem; display: block; color: var(--primary);">Open Link</a>`;
                         }
+                        
+                        item.innerHTML = `
+                            ${contentHtml}
+                            <button class="delete-media-btn" title="Remove Media">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            </button>
+                        `;
+                        
+                        item.querySelector('.delete-media-btn').addEventListener('click', () => {
+                            showCustomDialog({
+                                title: 'Remove Media',
+                                message: 'Are you sure you want to remove this media attachment?',
+                                confirmText: 'Remove',
+                                danger: true
+                            }, (confirm) => {
+                                if (confirm) {
+                                    customDefinitions[word].media.splice(index, 1);
+                                    localStorage.setItem('custom-definitions', JSON.stringify(customDefinitions));
+                                    renderMedia(customDefinitions[word].media, container);
+                                }
+                            });
+                        });
+                        
                         container.appendChild(item);
                     });
                 };
