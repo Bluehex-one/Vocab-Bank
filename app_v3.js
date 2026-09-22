@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const settingsModal = document.getElementById('settings-modal');
     const closeSettingsBtn = document.getElementById('close-settings');
     const apiKeyInput = document.getElementById('api-key-input');
+    const aiProviderSelect = document.getElementById('ai-provider-select');
     const saveApiKeyBtn = document.getElementById('save-api-key');
     const settingsStatus = document.getElementById('settings-status');
 
@@ -303,6 +304,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Settings logic
     settingsBtn.addEventListener('click', () => {
         apiKeyInput.value = localStorage.getItem('gemini-api-key') || '';
+        aiProviderSelect.value = localStorage.getItem('ai-provider') || 'gemini';
         settingsStatus.classList.add('hidden');
         settingsModal.classList.remove('hidden');
     });
@@ -322,8 +324,10 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             localStorage.removeItem('gemini-api-key');
         }
+        localStorage.setItem('ai-provider', aiProviderSelect.value);
         settingsStatus.classList.remove('hidden');
         setTimeout(() => {
+            settingsStatus.classList.add('hidden');
             settingsModal.classList.add('hidden');
         }, 1500);
     });
@@ -724,6 +728,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const customDefView = cardEl.querySelector('.custom-def-view');
         const aiToggleBtn = cardEl.querySelector('.ai-toggle-btn');
         const customToggleBtn = cardEl.querySelector('.custom-toggle-btn');
+        const tuneAiBtn = cardEl.querySelector('.tune-ai-btn');
         
         // If already open, just close it
         if (activeDefinitions[word]) {
@@ -803,6 +808,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 imgEl.classList.remove('hidden');
             } else {
                 imgEl.classList.add('hidden');
+            }
+            
+            if (tuneAiBtn) {
+                if (currentItem.isWikipedia) {
+                    tuneAiBtn.classList.add('hidden');
+                } else {
+                    tuneAiBtn.classList.remove('hidden');
+                }
             }
             
             if (total > 1) {
@@ -939,80 +952,78 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        async function fetchWikipediaFallback(word, section) {
+            let lang = 'en';
+            const baseSection = section.split('/')[0];
+            if (baseSection === 'chinese') lang = 'zh';
+            if (baseSection === 'french') lang = 'fr';
+
+            const response = await fetch(`https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(word)}`);
+            if (!response.ok) throw new Error('Wikipedia Not found');
+            const data = await response.json();
+            if (data.extract) {
+                return { text: data.extract, img: data.thumbnail ? data.thumbnail.source : null, isWikipedia: true };
+            } else {
+                throw new Error('Wikipedia No extract');
+            }
+        }
+
         try {
+            const aiProvider = localStorage.getItem('ai-provider') || 'gemini';
             const apiKey = localStorage.getItem('gemini-api-key');
             
-            if (apiKey) {
-                // Use auto-discovering Gemini API
-                const definitionText = await fetchGeminiDefinition(word, section, apiKey, extraInstructions);
-                
-                // Fetch wikipedia thumbnail asynchronously in background
-                let wikiImg = null;
+            let finalResult = null;
+            
+            if (aiProvider === 'gemini' && apiKey) {
                 try {
-                    let lang = 'en';
-                    const baseSection = section.split('/')[0];
-                    if (baseSection === 'chinese') lang = 'zh';
-                    if (baseSection === 'french') lang = 'fr';
+                    // Try to use Gemini
+                    const definitionText = await fetchGeminiDefinition(word, section, apiKey, extraInstructions);
                     
-                    const wikiResp = await fetch(`https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(word)}`);
-                    if (wikiResp.ok) {
-                        const wikiData = await wikiResp.json();
-                        if (wikiData.thumbnail && wikiData.thumbnail.source) {
-                            wikiImg = wikiData.thumbnail.source;
+                    // Fetch wikipedia thumbnail asynchronously in background
+                    let wikiImg = null;
+                    try {
+                        let lang = 'en';
+                        const baseSection = section.split('/')[0];
+                        if (baseSection === 'chinese') lang = 'zh';
+                        if (baseSection === 'french') lang = 'fr';
+                        
+                        const wikiResp = await fetch(`https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(word)}`);
+                        if (wikiResp.ok) {
+                            const wikiData = await wikiResp.json();
+                            if (wikiData.thumbnail && wikiData.thumbnail.source) {
+                                wikiImg = wikiData.thumbnail.source;
+                            }
                         }
-                    }
-                } catch(e) {}
-                
-                // Cache it!
-                if (!aiDefinitions[word]) {
-                    aiDefinitions[word] = { current: 0, history: [] };
+                    } catch(e) {}
+                    
+                    finalResult = { text: definitionText, img: wikiImg, isWikipedia: false };
+                } catch (geminiError) {
+                    console.warn('Gemini API failed, falling back to Wikipedia:', geminiError);
+                    finalResult = await fetchWikipediaFallback(word, section);
                 }
-                aiDefinitions[word].history.push({ text: definitionText, img: wikiImg });
-                aiDefinitions[word].current = aiDefinitions[word].history.length - 1;
-                
-                localStorage.setItem('ai-definitions', JSON.stringify(aiDefinitions));
-                
-                renderAiHistory();
             } else {
-                // Fallback to Wikipedia API
-                let lang = 'en';
-                const baseSection = section.split('/')[0];
-                if (baseSection === 'chinese') lang = 'zh';
-                if (baseSection === 'french') lang = 'fr';
-
-                const response = await fetch(`https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(word)}`);
-                
-                if (!response.ok) {
-                    throw new Error('Not found');
-                }
-                
-                const data = await response.json();
-                
-                if (data.extract) {
-                    let wikiImg = data.thumbnail ? data.thumbnail.source : null;
-                    // Cache Wikipedia result
-                    if (!aiDefinitions[word]) {
-                        aiDefinitions[word] = { current: 0, history: [] };
-                    }
-                    aiDefinitions[word].history.push({ text: data.extract, img: wikiImg });
-                    aiDefinitions[word].current = aiDefinitions[word].history.length - 1;
-                    
-                    localStorage.setItem('ai-definitions', JSON.stringify(aiDefinitions));
-                    
-                    renderAiHistory();
-                } else {
-                    throw new Error('No extract');
-                }
+                // User selected wikipedia or has no API key
+                finalResult = await fetchWikipediaFallback(word, section);
             }
+            
+            // Cache it!
+            if (!aiDefinitions[word]) {
+                aiDefinitions[word] = { current: 0, history: [] };
+            }
+            aiDefinitions[word].history.push({ 
+                text: finalResult.text, 
+                img: finalResult.img,
+                isWikipedia: finalResult.isWikipedia 
+            });
+            aiDefinitions[word].current = aiDefinitions[word].history.length - 1;
+            
+            localStorage.setItem('ai-definitions', JSON.stringify(aiDefinitions));
+            
+            renderAiHistory();
 
         } catch (error) {
             console.error(error);
-            const apiKey = localStorage.getItem('gemini-api-key');
-            if (apiKey) {
-                setDefinitionHTML(`The Gemini API failed to respond properly. Error: ${error.message}. Please double check your API key in the settings.`, `<em style="color: #ef4444;">(API Error)</em> <br><br>`);
-            } else {
-                setDefinitionHTML(`As an AI, I understand that **"${word}"** is a vocabulary term in your ${section} studies, but I couldn't find a good automatic definition for it. You can manually edit the definition below!`, `<em>(No automatic definition found)</em> <br><br>`);
-            }
+            setDefinitionHTML(`As an AI, I understand that **"${word}"** is a vocabulary term in your ${section} studies, but I couldn't find a good automatic definition for it. You can manually edit the definition below!`, `<em>(No automatic definition found)</em> <br><br>`);
         } finally {
             loading.classList.add('hidden');
             contentWrapper.classList.remove('hidden');

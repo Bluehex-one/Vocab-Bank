@@ -99,9 +99,14 @@
             <button class="close-btn" id="close-settings">&times;</button>
             <h2 style="margin-bottom: 1rem; color: var(--primary);">API Settings</h2>
             <p style="margin-bottom: 1.5rem; color: var(--text-muted); font-size: 0.95rem;">
-                Enter a <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: #a5b4fc;">Google Gemini API Key</a> to get true AI definitions for all subjects! If left blank, we'll fall back to Wikipedia.
+                Choose your preferred AI source. A <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: #a5b4fc;">Google Gemini API Key</a> provides true AI definitions for all subjects. Wikipedia is a free fallback.
             </p>
             <div class="input-group" style="flex-direction: column;">
+                <label for="ai-provider-select" style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">AI Provider</label>
+                <select id="ai-provider-select" class="section-dropdown" style="margin-bottom: 1rem; width: 100%;">
+                    <option value="gemini">Gemini AI (Requires API Key)</option>
+                    <option value="wikipedia">Wikipedia (Free, Online)</option>
+                </select>
                 <input type="password" id="api-key-input" placeholder="Paste your API key here..." style="margin-bottom: 1rem;">
                 <button id="save-api-key" class="btn-primary" style="width: 100%;">Save Settings</button>
             </div>
