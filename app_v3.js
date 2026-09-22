@@ -519,7 +519,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div class="ai-def-view">
                                 <img class="inline-def-image hidden" src="" alt="${word}" style="width: 100%; max-width: 300px; border-radius: 8px; margin-bottom: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
                                 <div class="inline-def-content"></div>
-                                <button class="btn-secondary tune-ai-btn" style="margin-top: 1rem; width: 100%; font-size: 0.85rem; padding: 0.5rem;">✨ Tune AI Definition</button>
+                                <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                                    <button class="btn-secondary tune-ai-btn" style="flex: 1; font-size: 0.85rem; padding: 0.5rem;">✨ Tune AI</button>
+                                    <button class="btn-secondary refresh-ai-btn" style="flex: 1; font-size: 0.85rem; padding: 0.5rem;">🔄 Refresh (Overwrite)</button>
+                                </div>
                             </div>
                             
                             <div class="custom-def-view hidden" style="margin-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem;">
@@ -553,6 +556,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const manualDefInput = card.querySelector('.manual-def-input');
                 const saveManualDefBtn = card.querySelector('.save-manual-def-btn');
                 const tuneAiBtn = card.querySelector('.tune-ai-btn');
+                const refreshAiBtn = card.querySelector('.refresh-ai-btn');
                 
                 const aiToggleBtn = card.querySelector('.ai-toggle-btn');
                 const customToggleBtn = card.querySelector('.custom-toggle-btn');
@@ -655,7 +659,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     }, (instructions) => {
                         if (instructions) {
                             activeDefinitions[word] = false; // force re-fetch
-                            toggleDefinition(word, currentSection, card, instructions);
+                            toggleDefinition(word, currentSection, card, instructions, false);
+                        }
+                    });
+                });
+                
+                refreshAiBtn.addEventListener('click', () => {
+                    showCustomDialog({
+                        title: 'Refresh AI Definition',
+                        message: 'Are you sure you want to generate a new definition and OVERWRITE this version? It will not be saved to history.',
+                        confirmText: 'Overwrite',
+                        danger: true
+                    }, (confirm) => {
+                        if (confirm) {
+                            activeDefinitions[word] = false; // force re-fetch
+                            toggleDefinition(word, currentSection, card, null, true);
                         }
                     });
                 });
@@ -717,7 +735,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderVocabulary();
     }
 
-    async function toggleDefinition(word, section, cardEl, extraInstructions = null) {
+    async function toggleDefinition(word, section, cardEl, extraInstructions = null, overwriteCurrent = false) {
         const safeWordId = word.replace(/\s+/g, '-');
         const container = cardEl.querySelector(`#def-container-${safeWordId}`);
         const loading = cardEl.querySelector('.def-loading');
@@ -729,6 +747,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const aiToggleBtn = cardEl.querySelector('.ai-toggle-btn');
         const customToggleBtn = cardEl.querySelector('.custom-toggle-btn');
         const tuneAiBtn = cardEl.querySelector('.tune-ai-btn');
+        const refreshAiBtn = cardEl.querySelector('.refresh-ai-btn');
         
         // If already open, just close it
         if (activeDefinitions[word]) {
@@ -813,8 +832,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (tuneAiBtn) {
                 if (currentItem.isWikipedia) {
                     tuneAiBtn.classList.add('hidden');
+                    if (refreshAiBtn) refreshAiBtn.classList.add('hidden');
                 } else {
                     tuneAiBtn.classList.remove('hidden');
+                    if (refreshAiBtn) refreshAiBtn.classList.remove('hidden');
                 }
             }
             
@@ -862,8 +883,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
-        // If we have cached AI definition and no extra instructions, use it
-        if (aiDefinitions[word] && !extraInstructions) {
+        // If we have cached AI definition and no extra instructions/overwrite, use it
+        if (aiDefinitions[word] && !extraInstructions && !overwriteCurrent) {
             contentWrapper.classList.remove('hidden');
             loading.classList.add('hidden');
             renderAiHistory();
@@ -1010,12 +1031,20 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!aiDefinitions[word]) {
                 aiDefinitions[word] = { current: 0, history: [] };
             }
-            aiDefinitions[word].history.push({ 
-                text: finalResult.text, 
-                img: finalResult.img,
-                isWikipedia: finalResult.isWikipedia 
-            });
-            aiDefinitions[word].current = aiDefinitions[word].history.length - 1;
+            if (overwriteCurrent && aiDefinitions[word].history.length > 0) {
+                aiDefinitions[word].history[aiDefinitions[word].current] = { 
+                    text: finalResult.text, 
+                    img: finalResult.img,
+                    isWikipedia: finalResult.isWikipedia 
+                };
+            } else {
+                aiDefinitions[word].history.push({ 
+                    text: finalResult.text, 
+                    img: finalResult.img,
+                    isWikipedia: finalResult.isWikipedia 
+                });
+                aiDefinitions[word].current = aiDefinitions[word].history.length - 1;
+            }
             
             localStorage.setItem('ai-definitions', JSON.stringify(aiDefinitions));
             
