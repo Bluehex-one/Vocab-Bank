@@ -824,7 +824,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // AI YouTube Video Embed HTML
             let aiVideoHtml = '';
             if (currentItem.text) {
-                const query = encodeURIComponent(`${word} ${section.replace(/\\//g, ' ')}`);
+                const query = encodeURIComponent(`${word} ${section.replace(/\//g, ' ')}`);
                 aiVideoHtml = `
                     <details style="margin-top: 1rem; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; overflow: hidden;">
                         <summary style="padding: 0.8rem; cursor: pointer; font-weight: 600; color: var(--text-light); list-style: none; display: flex; align-items: center; gap: 0.5rem;">
