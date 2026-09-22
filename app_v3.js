@@ -1067,7 +1067,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             console.error(error);
-            setDefinitionHTML(`As an AI, I understand that **"${word}"** is a vocabulary term in your ${section} studies, but I couldn't find a good automatic definition for it. You can manually edit the definition below!`, `<em>(No automatic definition found)</em> <br><br>`);
+            const provider = localStorage.getItem('ai-provider') || 'gemini';
+            if (provider === 'wikipedia') {
+                setDefinitionHTML(`I couldn't find a Wikipedia article for **"${word}"**. You can manually edit the definition below!`, `<em>(No Wikipedia article found)</em> <br><br>`);
+            } else {
+                setDefinitionHTML(`As an AI, I understand that **"${word}"** is a vocabulary term in your ${section} studies, but I couldn't find a good automatic definition for it. You can manually edit the definition below!`, `<em>(No automatic definition found)</em> <br><br>`);
+            }
             if (tuneAiBtn) tuneAiBtn.classList.add('hidden');
             if (refreshAiBtn) refreshAiBtn.classList.add('hidden');
         } finally {
