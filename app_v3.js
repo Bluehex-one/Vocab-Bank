@@ -1068,6 +1068,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error(error);
             setDefinitionHTML(`As an AI, I understand that **"${word}"** is a vocabulary term in your ${section} studies, but I couldn't find a good automatic definition for it. You can manually edit the definition below!`, `<em>(No automatic definition found)</em> <br><br>`);
+            if (tuneAiBtn) tuneAiBtn.classList.add('hidden');
+            if (refreshAiBtn) refreshAiBtn.classList.add('hidden');
         } finally {
             loading.classList.add('hidden');
             contentWrapper.classList.remove('hidden');
