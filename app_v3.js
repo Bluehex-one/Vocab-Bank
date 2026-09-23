@@ -748,9 +748,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function deleteWord(wordToDelete) {
-        vocabulary[currentSection] = vocabulary[currentSection].filter(w => w !== wordToDelete);
-        saveVocabulary();
-        renderVocabulary();
+        showConfirmModal(
+            'Delete Vocabulary Word',
+            `Are you sure you want to permanently delete the word "**${wordToDelete}**"? This will also delete its AI and Custom definition history.`,
+            () => {
+                vocabulary[currentSection] = vocabulary[currentSection].filter(w => w !== wordToDelete);
+                saveVocabulary();
+                
+                if (aiDefinitions[wordToDelete]) {
+                    delete aiDefinitions[wordToDelete];
+                    localStorage.setItem('ai-definitions', JSON.stringify(aiDefinitions));
+                }
+                if (customDefinitions[wordToDelete]) {
+                    delete customDefinitions[wordToDelete];
+                    localStorage.setItem('custom-definitions', JSON.stringify(customDefinitions));
+                }
+                
+                renderVocabulary();
+            }
+        );
     }
 
     async function toggleDefinition(word, section, cardEl, extraInstructions = null, overwriteCurrent = false) {
@@ -823,7 +839,13 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // AI YouTube Video Embed HTML
             let aiVideoHtml = '';
-            if (currentItem.text) {
+            if (currentItem.youtubeId) {
+                aiVideoHtml = `
+                    <div style="margin-top: 1rem; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+                        <iframe width="100%" height="250" src="https://www.youtube.com/embed/${currentItem.youtubeId}" frameborder="0" allowfullscreen></iframe>
+                    </div>
+                `;
+            } else if (currentItem.text) {
                 const query = encodeURIComponent(`${word} ${section.replace(/\//g, ' ')}`);
                 aiVideoHtml = `
                     <div style="margin-top: 1rem;">
@@ -920,8 +942,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (extra) {
                 prompt += ` Additionally, follow these instructions: ${extra}`;
             }
+            prompt += `\n\nALSO, provide the exact 11-character YouTube video ID of a highly relevant, popular, and educational YouTube video about this specific topic. You must output your entire response in strict JSON format like this: { "definition": "your definition here", "youtube_id": "the_11_char_id" }`;
             
-            const body = JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] });
+            const body = JSON.stringify({ 
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { responseMimeType: "application/json" }
+            });
             
             let modelName = localStorage.getItem('gemini-model-name-v2') || 'models/gemini-3.6-flash';
             if (!modelName.startsWith('models/')) modelName = 'models/' + modelName;
@@ -977,7 +1003,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const data = await response.json();
             if (data.candidates && data.candidates[0].content.parts[0].text) {
-                return data.candidates[0].content.parts[0].text;
+                const text = data.candidates[0].content.parts[0].text;
+                try {
+                    return JSON.parse(text);
+                } catch(e) {
+                    return { definition: text, youtube_id: null };
+                }
             } else {
                 throw new Error('No valid response from model');
             }
@@ -1027,7 +1058,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     } catch(e) {}
                     
-                    finalResult = { text: definitionText, img: wikiImg, isWikipedia: false };
+                    finalResult = { text: definitionText.definition, img: wikiImg, youtubeId: definitionText.youtube_id, isWikipedia: false };
                 } catch (geminiError) {
                     console.warn('Gemini API failed, falling back to Wikipedia:', geminiError);
                     finalResult = await fetchWikipediaFallback(word, section);
@@ -1045,12 +1076,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 aiDefinitions[word].history[aiDefinitions[word].current] = { 
                     text: finalResult.text, 
                     img: finalResult.img,
+                    youtubeId: finalResult.youtubeId || null,
                     isWikipedia: finalResult.isWikipedia 
                 };
             } else {
                 aiDefinitions[word].history.push({ 
                     text: finalResult.text, 
                     img: finalResult.img,
+                    youtubeId: finalResult.youtubeId || null,
                     isWikipedia: finalResult.isWikipedia 
                 });
                 aiDefinitions[word].current = aiDefinitions[word].history.length - 1;
